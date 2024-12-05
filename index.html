@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Treasure Vault</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #1a1a1a;
+            color: white;
+            font-family: Arial, sans-serif;
+            overflow: hidden;
+            min-height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+            position: relative;
+            z-index: 1;
+            margin-bottom: 550px;
+        }
+
+        .title {
+            color: #ffd700;
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+
+        .buttons {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.1s;
+            position: relative;
+            z-index: 2;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        #silver-btn {
+            background: linear-gradient(145deg, #C0C0C0, #A0A0A0);
+            color: #333;
+        }
+
+        #gold-btn {
+            background: linear-gradient(145deg, #FFD700, #DAA520);
+            color: #333;
+        }
+
+        #platinum-btn {
+            background: linear-gradient(145deg, #E5E4E2, #B4B4B4);
+            color: #333;
+        }
+
+        #diamond-btn {
+            background: linear-gradient(145deg, #B9F2FF, #87D7FF);
+            color: #333;
+        }
+
+        .counter {
+            margin-bottom: 20px;
+            font-size: 1.2em;
+            position: relative;
+            z-index: 2;
+        }
+
+        .stats {
+            padding: 10px;
+            background: #333;
+            border-radius: 5px;
+            text-align: left;
+            position: relative;
+            z-index: 2;
+            margin-bottom: 20px;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="title">Treasure Vault</h1>
+        
+        <div class="buttons">
+            <button id="silver-btn">Silver (1)</button>
+            <button id="gold-btn">Gold (5)</button>
+            <button id="platinum-btn">Platinum (10)</button>
+            <button id="diamond-btn">Diamond (25)</button>
+        </div>
+        
+        <div class="counter">
+            Items dropped: <span id="itemCount">0</span>
+        </div>
+        
+        <div class="stats">
+            Total Value: <span id="totalValue">0</span> points<br>
+            Current Level: <span id="currentLevel">Novice Collector</span>
+        </div>
+    </div>
+
+    <div id="canvas-container"></div>
+
+    <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const initialTokens = parseInt(urlParams.get('tokens')) || 0;
+        const initialRank = urlParams.get('rank') || 'Novice Collector';
+        const cloudFunctionUrl = urlParams.get('cloudFunction');
+
+        // Update initial stats
+        totalValue = initialTokens;
+        document.getElementById('currentLevel').textContent = initialRank;
+
+        // Initialize Matter.js modules
+        const Engine = Matter.Engine;
+        const Render = Matter.Render;
+        const World = Matter.World;
+        const Bodies = Matter.Bodies;
+        const Runner = Matter.Runner;
+        const Vertices = Matter.Vertices;
+        const Body = Matter.Body;
+
+        // Initialize statistics
+        let itemCount = 0;
+        let totalValue = 0;
+
+        const levels = [
+            { threshold: 0, name: "Novice Collector" },
+            { threshold: 100, name: "Bronze Collector" },
+            { threshold: 500, name: "Silver Collector" },
+            { threshold: 1000, name: "Gold Collector" },
+            { threshold: 2500, name: "Platinum Elite" },
+            { threshold: 5000, name: "Diamond Master" }
+        ];
+
+        const itemValues = {
+            silver: 1,
+            gold: 5,
+            platinum: 10,
+            diamond: 25
+        };
+
+        function updateLevel() {
+            for (let i = levels.length - 1; i >= 0; i--) {
+                if (totalValue >= levels[i].threshold) {
+                    document.getElementById('currentLevel').textContent = levels[i].name;
+                    break;
+                }
+            }
+        }
+
+        // Setup engine and runner
+        const engine = Engine.create();
+        const runner = Runner.create();
+
+        const render = Render.create({
+            element: document.getElementById('canvas-container'),
+            engine: engine,
+            options: {
+                width: window.innerWidth,
+                height: window.innerHeight,
+                wireframes: false,
+                background: 'transparent',
+                pixelRatio: window.devicePixelRatio
+            }
+        });
+
+        const itemProperties = {
+            silver: { 
+                density: 0.5,
+                restitution: 0.7,
+                size: 15,
+                fillStyle: '#C0C0C0',
+                strokeStyle: '#A0A0A0',
+                strokeWidth: 2
+            },
+            gold: { 
+                density: 1,
+                restitution: 0.6,
+                size: 15,
+                fillStyle: '#FFD700',
+                strokeStyle: '#DAA520',
+                strokeWidth: 2
+            },
+            platinum: { 
+                density: 2,
+                restitution: 0.5,
+                width: 50,
+                height: 25,
+                fillStyle: '#E5E4E2',
+                strokeStyle: '#B4B4B4',
+                strokeWidth: 3
+            },
+            diamond: { 
+                density: 4,
+                restitution: 0.4,
+                size: 15,
+                fillStyle: '#B9F2FF',
+                strokeStyle: '#87D7FF',
+                strokeWidth: 3
+            }
+        };
+
+        // Setup jar dimensions - 20% smaller
+        const jarWidth = 320;
+        const jarHeight = 480;
+        const wallThickness = 16;
+        const jarY = window.innerHeight - 100;
+
+        // Create jar
+        const jar = {
+            bottom: Bodies.rectangle(window.innerWidth/2, jarY, jarWidth, wallThickness, { 
+                isStatic: true,
+                render: { fillStyle: '#444444' }
+            }),
+            left: Bodies.rectangle(window.innerWidth/2 - jarWidth/2, jarY - jarHeight/2, wallThickness, jarHeight, { 
+                isStatic: true,
+                render: { fillStyle: '#444444' }
+            }),
+            right: Bodies.rectangle(window.innerWidth/2 + jarWidth/2, jarY - jarHeight/2, wallThickness, jarHeight, { 
+                isStatic: true,
+                render: { fillStyle: '#444444' }
+            })
+        };
+
+        // Add jar to world
+        World.add(engine.world, [jar.bottom, jar.left, jar.right]);
+
+        function createItem(type) {
+            const props = itemProperties[type];
+            let body;
+
+            // Wider drop range
+            const dropRange = jarWidth - 100;
+            const xPos = window.innerWidth/2 + (Math.random() * dropRange - dropRange/2);
+            const yPos = 50;
+
+            const options = {
+                density: props.density,
+                restitution: props.restitution,
+                friction: 0.1,
+                frictionAir: 0.001,
+                render: {
+                    fillStyle: props.fillStyle,
+                    strokeStyle: props.strokeStyle,
+                    lineWidth: props.strokeWidth
+                }
+            };
+
+            switch(type) {
+                case 'silver':
+                case 'gold':
+                    body = Bodies.circle(xPos, yPos, props.size, options);
+                    break;
+                case 'platinum':
+                    body = Bodies.rectangle(xPos, yPos, props.width, props.height, options);
+                    break;
+                case 'diamond':
+                    const diamondVertices = Vertices.fromPath(
+                        `0 -${props.size} ${props.size} 0 0 ${props.size} -${props.size} 0`
+                    );
+                    body = Bodies.fromVertices(xPos, yPos, diamondVertices, options);
+                    break;
+            }
+
+            World.add(engine.world, body);
+            itemCount++;
+            totalValue += itemValues[type];
+            
+            document.getElementById('itemCount').textContent = itemCount;
+            document.getElementById('totalValue').textContent = totalValue;
+            updateLevel();
+        }
+
+        // Add button event listeners
+        let isClicking = false;
+        const buttons = ['silver-btn', 'gold-btn', 'platinum-btn', 'diamond-btn'];
+        
+        buttons.forEach(btnId => {
+            const btn = document.getElementById(btnId);
+            btn.addEventListener('mousedown', () => {
+                isClicking = true;
+                const type = btnId.split('-')[0];
+                function dropWhileClicking() {
+                    if (isClicking) {
+                        createItem(type);
+                        setTimeout(dropWhileClicking, 100);
+                    }
+                }
+                dropWhileClicking();
+            });
+        });
+
+        document.addEventListener('mouseup', () => {
+            isClicking = false;
+        });
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+            render.canvas.width = window.innerWidth;
+            render.canvas.height = window.innerHeight;
+            
+            const newJarY = window.innerHeight - 100;
+            
+            Body.setPosition(jar.bottom, { 
+                x: window.innerWidth/2, 
+                y: newJarY 
+            });
+            Body.setPosition(jar.left, { 
+                x: window.innerWidth/2 - jarWidth/2, 
+                y: newJarY - jarHeight/2 
+            });
+            Body.setPosition(jar.right, { 
+                x: window.innerWidth/2 + jarWidth/2, 
+                y: newJarY - jarHeight/2 
+            });
+        });
+
+        // Start the engine
+        Runner.run(runner, engine);
+        Render.run(render);
+    </script>
+</body>
+</html>
