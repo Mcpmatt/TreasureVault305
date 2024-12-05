@@ -122,14 +122,14 @@
     <div id="canvas-container"></div>
 
     <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const initialTokens = parseInt(urlParams.get('tokens')) || 0;
-        const initialRank = urlParams.get('rank') || 'Novice Collector';
-        const cloudFunctionUrl = urlParams.get('cloudFunction');
+       // const urlParams = new URLSearchParams(window.location.search);
+       // const initialTokens = parseInt(urlParams.get('tokens')) || 0;
+       // const initialRank = urlParams.get('rank') || 'Novice Collector';
+       // const cloudFunctionUrl = urlParams.get('cloudFunction');
 
         // Update initial stats
-        totalValue = initialTokens;
-        document.getElementById('currentLevel').textContent = initialRank;
+       // totalValue = initialTokens;
+       // document.getElementById('currentLevel').textContent = initialRank;
 
         // Initialize Matter.js modules
         const Engine = Matter.Engine;
@@ -145,12 +145,12 @@
         let totalValue = 0;
 
         const levels = [
-            { threshold: 0, name: "Novice Collector" },
-            { threshold: 100, name: "Bronze Collector" },
-            { threshold: 500, name: "Silver Collector" },
-            { threshold: 1000, name: "Gold Collector" },
-            { threshold: 2500, name: "Platinum Elite" },
-            { threshold: 5000, name: "Diamond Master" }
+            { threshold: 0, name: "Casual Gambler" },
+            { threshold: 1000, name: "Gambling Enjoyer" },
+            { threshold: 5000, name: "Gamling Degenerate" },
+            { threshold: 10000, name: "Baller" },
+            { threshold: 25000, name: "VIP" },
+            { threshold: 50000, name: "Casino Lord" }
         ];
 
         const itemValues = {
