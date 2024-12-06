@@ -585,6 +585,13 @@
                 const newVaultValue = vaultValue + jarValue;
                 const newTokenCount = tokenCount; // since we already subtracted from tokenCount when adding to jar
 
+                // Get userId from URL parameters
+                const urlParams = new URLSearchParams(window.location.search);
+                const userId = urlParams.get('uid');
+                
+                // Construct URL with uid parameter
+                const depositUrl = `${cloudFunctionUrl}?uid=${userId}`;
+                
                 const response = await fetch(cloudFunctionUrl, {
                     method: 'POST',
                     mode: 'cors',
