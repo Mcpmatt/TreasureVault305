@@ -370,9 +370,9 @@
             
             if (paramTokens !== null && !isNaN(parseInt(paramTokens))) {
                 tokenCount = parseInt(paramTokens);
+                userId = urlParams.get('uid');
                 vaultValue = parseInt(urlParams.get('vault_value') || '0');
                 cloudFunctionUrl = urlParams.get('cloudFunction');
-                userId = urlParams.get('uid');
                 
                 // Check if we have all required parameters
                 if (cloudFunctionUrl && userId) {
