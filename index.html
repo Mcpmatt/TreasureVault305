@@ -565,13 +565,23 @@
 
         async function handleDeposit() {
             if (jarValue <= 0) return;
-
             const depositBtn = document.getElementById('depositBtn');
             const errorMsg = document.getElementById('errorMessage');
             
+            const urlParams = new URLSearchParams(window.location.search);
+            const cloudFunctionUrl = urlParams.get('cloudFunction');
+            const userId = urlParams.get('uid');
+            
+            // Verify required parameters
+            if (!cloudFunctionUrl || !userId) {
+                errorMsg.textContent = 'Missing required parameters for deposit';
+                errorMsg.style.display = 'block';
+                return;
+            }
+        
             depositBtn.disabled = true;
             errorMsg.style.display = 'none';
-
+        
             if (isUsingDefaults) {
                 vaultValue += jarValue;
                 clearJar();
@@ -579,16 +589,11 @@
                 checkButtonStates();
                 return;
             }
-
+        
             try {
-
-                const newVaultValue = vaultValue + jarValue;
-                const newTokenCount = tokenCount; // since we already subtracted from tokenCount when adding to jar
-
-                // Get userId from URL parameters
-                const urlParams = new URLSearchParams(window.location.search);
-                const userId = urlParams.get('uid');
-                
+                const newVaultValue = Math.floor(vaultValue + jarValue); // Floor the values
+                const newTokenCount = Math.floor(tokenCount);
+        
                 const response = await fetch(cloudFunctionUrl, {
                     method: 'POST',
                     mode: 'cors',
@@ -597,19 +602,22 @@
                         'Accept': 'application/json'
                     },
                     body: JSON.stringify({
+                        uid: userId,
                         finalBalance: newTokenCount,
-                        vaultValue: newVaultValue,
+                        vaultValue: newVaultValue
                     })
                 });
-
+        
                 if (!response.ok) {
-                    throw new Error(await response.text());
+                    const errorText = await response.text();
+                    console.error('Response not ok:', errorText);
+                    throw new Error(errorText);
                 }
-
+        
                 const data = await response.json();
                 
                 if (data.success) {
-                    vaultValue += jarValue;
+                    vaultValue = newVaultValue;
                     clearJar();
                     updateDisplay();
                     checkButtonStates();
@@ -617,7 +625,8 @@
                     throw new Error('Deposit failed');
                 }
             } catch (error) {
-                errorMsg.textContent = error.message;
+                console.error('Deposit error:', error);
+                errorMsg.textContent = error instanceof Error ? error.message : 'Deposit failed';
                 errorMsg.style.display = 'block';
                 tokenCount += jarValue;
                 clearJar();
