@@ -564,35 +564,47 @@
         });
 
         async function handleDeposit() {
-            if (jarValue <= 0) return;
-            const depositBtn = document.getElementById('depositBtn');
-            const errorMsg = document.getElementById('errorMessage');
+            console.log('Starting deposit process');
+            console.log('Current state:', {
+                jarValue,
+                tokenCount,
+                vaultValue,
+                isUsingDefaults,
+                cloudFunctionUrl,
+                userId
+            });
+        
+            if (jarValue <= 0) {
+                console.log('Deposit cancelled - jar value is 0');
+                return;
+            }
             
-            const urlParams = new URLSearchParams(window.location.search);
-            const cloudFunctionUrl = urlParams.get('cloudFunction');
-            const userId = urlParams.get('uid');
-            
-            // Verify required parameters
-            if (!cloudFunctionUrl || !userId) {
-                errorMsg.textContent = 'Missing required parameters for deposit';
+            if (isUsingDefaults) {
+                console.log('Using defaults - deposit not allowed');
+                const errorMsg = document.getElementById('errorMessage');
+                errorMsg.textContent = 'Cannot deposit while using default values';
                 errorMsg.style.display = 'block';
                 return;
             }
         
+            const depositBtn = document.getElementById('depositBtn');
+            const errorMsg = document.getElementById('errorMessage');
+            
             depositBtn.disabled = true;
             errorMsg.style.display = 'none';
         
-            if (isUsingDefaults) {
-                vaultValue += jarValue;
-                clearJar();
-                updateDisplay();
-                checkButtonStates();
-                return;
-            }
-        
             try {
-                const newVaultValue = Math.floor(vaultValue + jarValue); // Floor the values
+                const newVaultValue = Math.floor(vaultValue + jarValue);
                 const newTokenCount = Math.floor(tokenCount);
+        
+                console.log('Preparing fetch request:', {
+                    url: cloudFunctionUrl,
+                    body: {
+                        uid: userId,
+                        finalBalance: newTokenCount,
+                        vaultValue: newVaultValue
+                    }
+                });
         
                 const response = await fetch(cloudFunctionUrl, {
                     method: 'POST',
@@ -608,6 +620,11 @@
                     })
                 });
         
+                console.log('Fetch response received:', {
+                    status: response.status,
+                    ok: response.ok
+                });
+        
                 if (!response.ok) {
                     const errorText = await response.text();
                     console.error('Response not ok:', errorText);
@@ -615,8 +632,10 @@
                 }
         
                 const data = await response.json();
+                console.log('Response data:', data);
                 
                 if (data.success) {
+                    console.log('Deposit successful, updating values');
                     vaultValue = newVaultValue;
                     clearJar();
                     updateDisplay();
@@ -625,7 +644,7 @@
                     throw new Error('Deposit failed');
                 }
             } catch (error) {
-                console.error('Deposit error:', error);
+                console.error('Full error details:', error);
                 errorMsg.textContent = error instanceof Error ? error.message : 'Deposit failed';
                 errorMsg.style.display = 'block';
                 tokenCount += jarValue;
