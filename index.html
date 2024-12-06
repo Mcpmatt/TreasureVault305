@@ -366,15 +366,25 @@
 
         function initializeValues() {
             const urlParams = new URLSearchParams(window.location.search);
-            const paramTokens = urlParams.get('tokens');
+            const paramTokens = urlParams.get('token_count'); // Changed from 'tokens' to 'token_count'
             
             if (paramTokens !== null && !isNaN(parseInt(paramTokens))) {
                 tokenCount = parseInt(paramTokens);
                 vaultValue = parseInt(urlParams.get('vault_value') || '0');
-                cloudFunctionUrl = urlParams.get('cloudFunction') || '';
-                userId = urlParams.get('uid') || '';
-                isUsingDefaults = false;
+                cloudFunctionUrl = urlParams.get('cloudFunction');
+                userId = urlParams.get('uid');
+                
+                // Check if we have all required parameters
+                if (cloudFunctionUrl && userId) {
+                    isUsingDefaults = false;
+                } else {
+                    isUsingDefaults = true;
+                    const errorMsg = document.getElementById('errorMessage');
+                    errorMsg.textContent = 'Missing required parameters - some features may be limited';
+                    errorMsg.style.display = 'block';
+                }
             } else {
+                // Fallback to defaults if no valid token count
                 tokenCount = DEFAULT_TOKENS;
                 vaultValue = 0;
                 isUsingDefaults = true;
@@ -383,6 +393,9 @@
                 errorMsg.textContent = 'Using default values - some features may be limited';
                 errorMsg.style.display = 'block';
             }
+            
+            // Initialize jar value to 0
+            jarValue = 0;
             
             updateDisplay();
             checkButtonStates();
@@ -405,7 +418,7 @@
             const jarWidth = 320;
             const jarHeight = 480;
             const wallThickness = 30;
-            const jarY = window.innerHeight - 30;
+            const jarY = window.innerHeight - 50;
 
             // Create jar with updated collision properties
             jar = {
@@ -550,7 +563,6 @@
             });
         });
 
-
         async function handleDeposit() {
             if (jarValue <= 0) return;
 
@@ -569,6 +581,10 @@
             }
 
             try {
+
+                const newVaultValue = vaultValue + jarValue;
+                const newTokenCount = tokenCount; // since we already subtracted from tokenCount when adding to jar
+
                 const response = await fetch(cloudFunctionUrl, {
                     method: 'POST',
                     mode: 'cors',
@@ -577,10 +593,8 @@
                         'Accept': 'application/json'
                     },
                     body: JSON.stringify({
-                        uid: userId,
-                        deposit_amount: jarValue,
-                        current_tokens: tokenCount,
-                        current_vault_value: vaultValue
+                        finalBalance: newTokenCount,
+                        vaultValue: newVaultValue,
                     })
                 });
 
