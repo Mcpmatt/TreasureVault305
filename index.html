@@ -582,8 +582,8 @@
                 },
                 body: JSON.stringify({
                     uid: userId,
-                    token_count: Math.floor(tokenCount),  // Changed to match schema
-                    vault_value: Math.floor(vaultValue + jarValue)  // Matches schema
+                    finalBalance: Math.floor(tokenCount),      // Matches cloud function expectation
+                    vaultValue: Math.floor(vaultValue + jarValue)  // Matches cloud function expectation
                 })
             })
             .then(response => {
