@@ -564,97 +564,60 @@
         });
 
         async function handleDeposit() {
-            console.log('Starting deposit process');
-            console.log('Current state:', {
-                jarValue,
-                tokenCount,
-                vaultValue,
-                isUsingDefaults,
-                cloudFunctionUrl,
-                userId
-            });
-        
-            if (jarValue <= 0) {
-                console.log('Deposit cancelled - jar value is 0');
-                return;
-            }
-            
-            if (isUsingDefaults) {
-                console.log('Using defaults - deposit not allowed');
-                const errorMsg = document.getElementById('errorMessage');
-                errorMsg.textContent = 'Cannot deposit while using default values';
-                errorMsg.style.display = 'block';
-                return;
-            }
-        
-            const depositBtn = document.getElementById('depositBtn');
-            const errorMsg = document.getElementById('errorMessage');
-            
-            depositBtn.disabled = true;
-            errorMsg.style.display = 'none';
-        
-            try {
-                const newVaultValue = Math.floor(vaultValue + jarValue);
-                const newTokenCount = Math.floor(tokenCount);
-        
-                console.log('Preparing fetch request:', {
-                    url: cloudFunctionUrl,
-                    body: {
-                        uid: userId,
-                        finalBalance: newTokenCount,
-                        vaultValue: newVaultValue
-                    }
-                });
-        
-                const response = await fetch(cloudFunctionUrl, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        uid: userId,
-                        finalBalance: newTokenCount,
-                        vaultValue: newVaultValue
-                    })
-                });
-        
-                console.log('Fetch response received:', {
-                    status: response.status,
-                    ok: response.ok
-                });
-        
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    console.error('Response not ok:', errorText);
-                    throw new Error(errorText);
-                }
-        
-                const data = await response.json();
-                console.log('Response data:', data);
-                
-                if (data.success) {
-                    console.log('Deposit successful, updating values');
-                    vaultValue = newVaultValue;
-                    clearJar();
-                    updateDisplay();
-                    checkButtonStates();
-                } else {
-                    throw new Error('Deposit failed');
-                }
-            } catch (error) {
-                console.error('Full error details:', error);
-                errorMsg.textContent = error instanceof Error ? error.message : 'Deposit failed';
-                errorMsg.style.display = 'block';
-                tokenCount += jarValue;
-                clearJar();
-                updateDisplay();
-            } finally {
-                depositBtn.disabled = false;
-            }
-        }
+    const urlParams = new URLSearchParams(window.location.search);
+    const cloudFunctionUrl = urlParams.get('cloudFunction');
+    const userId = urlParams.get('uid');
+    
+    if (jarValue <= 0) return;
+    
+    const depositBtn = document.getElementById('depositBtn');
+    depositBtn.disabled = true;
 
+    fetch(cloudFunctionUrl, {
+        method: 'POST',
+        mode: 'cors',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            uid: userId,
+            token_count: Math.floor(tokenCount),  // Changed to match schema
+            vault_value: Math.floor(vaultValue + jarValue)  // Matches schema
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => {
+                const errorMsg = document.getElementById('errorMessage');
+                errorMsg.textContent = `Server error: ${text}`;
+                errorMsg.style.display = 'block';
+                throw new Error(text);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            vaultValue += jarValue;
+            clearJar();
+            updateDisplay();
+            checkButtonStates();
+        }
+    })
+    .catch(error => {
+        console.error('Deposit error:', error);
+        const errorMsg = document.getElementById('errorMessage');
+        errorMsg.textContent = error.message;
+        errorMsg.style.display = 'block';
+        tokenCount += jarValue;
+        clearJar();
+        updateDisplay();
+    })
+    .finally(() => {
+        depositBtn.disabled = false;
+    });
+}
         function resetJar() {
             if (jarValue > 0) {
                 tokenCount += jarValue;
