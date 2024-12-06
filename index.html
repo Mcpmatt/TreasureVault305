@@ -134,6 +134,44 @@
             position: relative;
             z-index: 2;
         }
+        .particle {
+            position: absolute;
+            pointer-events: none;
+            animation: particle 0.5s ease-out forwards;
+        }
+
+        @keyframes particle {
+            0% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: scale(0) rotate(360deg);
+                opacity: 0;
+            }
+        }
+
+        /* Adding shine effect to buttons */
+        button::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(
+                45deg,
+                transparent,
+                rgba(255,255,255,0.1),
+                transparent
+            );
+            transform: translateX(-100%);
+            transition: transform 0.3s;
+        }
+
+        button:hover::after {
+            transform: translateX(100%);
+        }
     </style>
 </head>
 <body>
@@ -206,37 +244,49 @@
         // Item properties
         const itemProperties = {
             silver: { 
-                density: 0.8,
-                restitution: 0.3,
-                size: 15,
+                density: 0.2,
+                restitution: 0.95,
+                size: 12,
                 fillStyle: '#C0C0C0',
                 strokeStyle: '#A0A0A0',
-                strokeWidth: 2
+                strokeWidth: 2,
+                frictionAir: 0.001,
+                torque: 0.05,
+                particleColor: '#C0C0C0'
             },
             gold: { 
-                density: 1.2,
-                restitution: 0.3,
+                density: 0.8,
+                restitution: 0.7,
                 size: 15,
                 fillStyle: '#FFD700',
                 strokeStyle: '#DAA520',
-                strokeWidth: 2
+                strokeWidth: 2,
+                frictionAir: 0.002,
+                torque: 0.03,
+                particleColor: '#FFD700'
             },
             platinum: { 
-                density: 2,
-                restitution: 0.3,
+                density: 2.5,
+                restitution: 0.4,
                 width: 50,
                 height: 25,
                 fillStyle: '#E5E4E2',
                 strokeStyle: '#B4B4B4',
-                strokeWidth: 3
+                strokeWidth: 3,
+                frictionAir: 0.003,
+                torque: 0.02,
+                particleColor: '#E5E4E2'
             },
             diamond: { 
-                density: 4,
-                restitution: 0.3,
-                size: 15,
+                density: 10.0,
+                restitution: 0.15,
+                size: 20,
                 fillStyle: '#B9F2FF',
                 strokeStyle: '#87D7FF',
-                strokeWidth: 3
+                strokeWidth: 3,
+                frictionAir: 0.005,
+                torque: 0.01,
+                particleColor: '#B9F2FF'
             }
         };
 
@@ -326,19 +376,36 @@
             Render.run(render);
         }
 
+        function createParticles(x, y, color) {
+            const particleCount = 5;
+            for (let i = 0; i < particleCount; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = x + 'px';
+                particle.style.top = y + 'px';
+                particle.style.backgroundColor = color;
+                particle.style.width = '4px';
+                particle.style.height = '4px';
+                particle.style.transform = `translate(${(Math.random() - 0.5) * 50}px, ${(Math.random() - 0.5) * 50}px)`;
+                document.body.appendChild(particle);
+                setTimeout(() => particle.remove(), 500);
+            }
+        }
+
         function dropToken(value, type) {
             if (tokenCount >= value) {
                 const props = itemProperties[type];
                 
+                // Increased drop height for more dramatic effect
                 const dropRange = 200;
                 const xPos = window.innerWidth/2 + (Math.random() * dropRange - dropRange/2);
-                const yPos = 50;
+                const yPos = 20; // Higher drop point
 
                 const options = {
                     density: props.density,
                     restitution: props.restitution,
                     friction: 0.5,
-                    frictionAir: 0.002,
+                    frictionAir: props.frictionAir,
                     slop: 0,
                     render: {
                         fillStyle: props.fillStyle,
@@ -352,17 +419,27 @@
                     case 'silver':
                     case 'gold':
                         body = Bodies.circle(xPos, yPos, props.size, options);
+                        // Add initial spin
+                        Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.2);
                         break;
                     case 'platinum':
                         body = Bodies.rectangle(xPos, yPos, props.width, props.height, options);
+                        Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.1);
                         break;
                     case 'diamond':
                         const diamondVertices = Vertices.fromPath(
                             `0 -${props.size} ${props.size} 0 0 ${props.size} -${props.size} 0`
                         );
                         body = Bodies.fromVertices(xPos, yPos, diamondVertices, options);
+                        Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.05);
                         break;
                 }
+
+                // Add random initial velocity
+                Body.setVelocity(body, {
+                    x: (Math.random() - 0.5) * 2,
+                    y: 0
+                });
 
                 World.add(engine.world, body);
                 items.push(body);
@@ -373,6 +450,38 @@
                 document.getElementById('depositBtn').disabled = false;
             }
         }
+
+        // Enhanced collision handling
+        Matter.Events.on(engine, 'collisionStart', function(event) {
+            event.pairs.forEach(function(pair) {
+                const collision = pair.collision;
+                const force = collision.normal.x * collision.normal.x + 
+                            collision.normal.y * collision.normal.y;
+                
+                if (force > 0.5) {  // Only create particles for significant collisions
+                    createParticles(
+                        collision.bodyA.position.x,
+                        collision.bodyA.position.y,
+                        collision.bodyA.render.fillStyle
+                    );
+                }
+                
+                // Add random spin on collision
+                if (!pair.bodyA.isStatic) {
+                    Body.setAngularVelocity(
+                        pair.bodyA,
+                        pair.bodyA.angularVelocity + (Math.random() - 0.5) * 0.1
+                    );
+                }
+                if (!pair.bodyB.isStatic) {
+                    Body.setAngularVelocity(
+                        pair.bodyB,
+                        pair.bodyB.angularVelocity + (Math.random() - 0.5) * 0.1
+                    );
+                }
+            });
+        });
+
 
         async function handleDeposit() {
             if (jarValue <= 0) return;
