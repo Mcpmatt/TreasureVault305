@@ -12,6 +12,8 @@
             font-family: Arial, sans-serif;
             overflow: hidden;
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
         }
 
         .container {
@@ -20,102 +22,160 @@
             text-align: center;
             position: relative;
             z-index: 1;
-            margin-bottom: 550px;
+            padding-bottom: min(550px, 70vh);
         }
 
         .title {
             color: #ffd700;
-            font-size: 24px;
-            margin-bottom: 20px;
+            font-size: clamp(20px, 5vw, 24px);
+            margin-bottom: clamp(10px, 2vh, 20px);
         }
 
         .buttons {
             display: flex;
             flex-direction: column;
-            gap: 10px;
-            margin-bottom: 20px;
+            gap: clamp(5px, 1vh, 10px);
+            margin-bottom: clamp(10px, 2vh, 20px);
         }
 
         .token-buttons {
             display: flex;
             justify-content: center;
-            gap: 10px;
+            gap: clamp(8px, 1.5vw, 15px);
+            flex-wrap: wrap;
+            padding: 10px;
+            align-items: center; /* Ensure buttons are centered vertically */
         }
 
-        .action-buttons {
-            display: flex;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        button {
-            padding: 12px 20px;
+        /* Shared button styles */
+        .token-btn {
             border: none;
-            border-radius: 8px;
             cursor: pointer;
             font-weight: bold;
-            transition: transform 0.1s;
+            transition: transform 0.1s, box-shadow 0.2s;
             position: relative;
             z-index: 2;
-            flex: 0 1 auto;
-            min-width: 120px;
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        button:active:not(:disabled) {
-            transform: scale(0.95);
-        }
-
-        #silverBtn { 
-            background: linear-gradient(145deg, #C0C0C0, #A0A0A0);
+            display: flex;
+            line-height: 1;
+            padding: 0;
+            margin: 0;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(14px, 3vw, 16px);
             color: #333;
+            text-shadow: 0 1px 1px rgba(255,255,255,0.5);
+        }
+
+        /* Coin-shaped buttons (Silver and Gold) */
+        .coin-btn {
+            width: clamp(42px, 10.5vw, 56px);  /* 30% smaller than before */
+            height: clamp(42px, 10.5vw, 56px); /* 30% smaller than before */
+            border-radius: 50%;
+            box-shadow: 
+                inset 0 -2px 2px rgba(0,0,0,0.2),
+                0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        /* Updated platinum button style to align the number */
+        #platinumBtn {
+            width: clamp(50px, 12vw, 65px);
+            height: clamp(50px, 8vw, 45px);
+            border-radius: 6px;
+            background: linear-gradient(145deg, #E5E4E2, #B4B4B4);
+            box-shadow: 
+                inset 0 -2px 2px rgba(0,0,0,0.2),
+                0 2px 4px rgba(0,0,0,0.3);
+            line-height: 1;           /* Ensures consistent text positioning */
+            padding: 0;               /* Remove default padding */
+            margin-top: 4px;          /* Adjust the top margin to align with other buttons */
+            margin-bottom: 4px;       /* Balance the top margin */
+        }
+
+
+        /* Diamond-shaped button */
+        .diamond-btn {
+            width: clamp(40px, 12vw, 50px);    /* 30% smaller than before */
+            height: clamp(50px, 12vw, 50px);   /* 30% smaller than before */
+            transform: rotate(45deg);
+            box-shadow: 
+                inset 0 -2px 2px rgba(0,0,0,0.2),
+                0 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .diamond-btn span {
+            transform: rotate(-45deg);
+        }
+
+        /* Button specific styles */
+        #silverBtn { 
+            background: radial-gradient(circle at 30% 30%, #E8E8E8, #C0C0C0);
         }
 
         #goldBtn { 
-            background: linear-gradient(145deg, #FFD700, #DAA520);
-            color: #333;
-        }
-
-        #platinumBtn { 
-            background: linear-gradient(145deg, #E5E4E2, #B4B4B4);
-            color: #333;
+            background: radial-gradient(circle at 30% 30%, #FFD700, #DAA520);
         }
 
         #diamondBtn { 
-            background: linear-gradient(145deg, #B9F2FF, #87D7FF);
-            color: #333;
+            background: radial-gradient(circle at 30% 30%, #B9F2FF, #87D7FF);
+        }
+
+        .token-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                inset 0 -2px 2px rgba(0,0,0,0.2),
+                0 4px 8px rgba(0,0,0,0.3);
+        }
+
+        .token-btn:active {
+            transform: translateY(1px);
+            box-shadow: 
+                inset 0 -1px 1px rgba(0,0,0,0.2),
+                0 1px 2px rgba(0,0,0,0.3);
+        }
+
+        #diamondBtn:hover {
+            transform: rotate(45deg) translateY(-2px);
+        }
+
+        #diamondBtn:active {
+            transform: rotate(45deg) translateY(1px);
+        }
+
+        /* Action buttons */
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            gap: clamp(5px, 1vw, 10px);
+            flex-wrap: wrap;
         }
 
         #depositBtn {
             background: #22c55e;
             color: white;
-            min-width: 150px;
+            min-width: min(150px, 40vw);
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
         }
 
         #resetBtn {
             background: #ef4444;
             color: white;
-            min-width: 150px;
-        }
-
-        .stats {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 15px;
+            min-width: min(150px, 40vw);
+            padding: 12px 20px;
             border-radius: 8px;
-            margin-bottom: 20px;
-            max-width: 600px;
-            margin-left: auto;
-            margin-right: auto;
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
         }
 
         .stat-row {
             display: flex;
             justify-content: space-between;
             margin: 5px 0;
+            font-size: clamp(14px, 3vw, 16px);
         }
 
         #canvas-container {
@@ -133,7 +193,36 @@
             display: none;
             position: relative;
             z-index: 2;
+            font-size: clamp(12px, 2.5vw, 14px);
         }
+
+        @media screen and (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+
+            .container {
+                padding-bottom: 60vh;
+            }
+
+            .token-buttons {
+                display: grid;
+                grid-template-columns: repeat(2, 1fr);
+                justify-items: center;
+                gap: 12px;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+                gap: 5px;
+            }
+
+            #depositBtn, #resetBtn {
+                width: 100%;
+                min-width: unset;
+            }
+        }
+
         .particle {
             position: absolute;
             pointer-events: none;
@@ -174,10 +263,10 @@
 
         <div class="buttons">
             <div class="token-buttons">
-                <button id="silverBtn" onclick="dropToken(1, 'silver')">Silver (1)</button>
-                <button id="goldBtn" onclick="dropToken(5, 'gold')">Gold (5)</button>
-                <button id="platinumBtn" onclick="dropToken(10, 'platinum')">Platinum (10)</button>
-                <button id="diamondBtn" onclick="dropToken(25, 'diamond')">Diamond (25)</button>
+                <button id="silverBtn" class="token-btn coin-btn" onclick="dropToken(1, 'silver')">1</button>
+                <button id="goldBtn" class="token-btn coin-btn" onclick="dropToken(5, 'gold')">5</button>
+                <button id="platinumBtn" class="token-btn" onclick="dropToken(10, 'platinum')">10</button>
+                <button id="diamondBtn" class="token-btn diamond-btn" onclick="dropToken(25, 'diamond')"><span>25</span></button>
             </div>
             <div class="action-buttons">
                 <button id="depositBtn" onclick="handleDeposit()" disabled>Deposit to Vault</button>
