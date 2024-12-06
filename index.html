@@ -174,16 +174,18 @@
     <div id="canvas-container"></div>
 
     <script>
-       // const urlParams = new URLSearchParams(window.location.search);
-       // const initialTokens = parseInt(urlParams.get('tokens')) || 0;
-       // const initialRank = urlParams.get('rank') || 'Novice Collector';
-       // const cloudFunctionUrl = urlParams.get('cloudFunction');
+        // Constants
+        const DEFAULT_TOKENS = 500;
+        
+        // Initialize variables
+        let tokenCount = DEFAULT_TOKENS;
+        let vaultValue = 0;
+        let jarValue = 0;
+        let cloudFunctionUrl = '';
+        let userId = '';
+        let isUsingDefaults = false;
 
-        // Update initial stats
-       // totalValue = initialTokens;
-       // document.getElementById('currentLevel').textContent = initialRank;
-
-        // Initialize Matter.js modules
+        // Matter.js modules
         const Engine = Matter.Engine;
         const Render = Matter.Render;
         const World = Matter.World;
@@ -192,63 +194,28 @@
         const Vertices = Matter.Vertices;
         const Body = Matter.Body;
 
-        // Initialize statistics
-        let itemCount = 0;
-        let totalValue = 0;
-
-        const levels = [
-            { threshold: 0, name: "Casual Gambler" },
-            { threshold: 1000, name: "Gambling Enjoyer" },
-            { threshold: 5000, name: "Gamling Degenerate" },
-            { threshold: 10000, name: "Baller" },
-            { threshold: 25000, name: "VIP" },
-            { threshold: 50000, name: "Casino Lord" }
-        ];
-
-        const itemValues = {
-            silver: 1,
-            gold: 5,
-            platinum: 10,
-            diamond: 25
-        };
-
-        function updateLevel() {
-            for (let i = levels.length - 1; i >= 0; i--) {
-                if (totalValue >= levels[i].threshold) {
-                    document.getElementById('currentLevel').textContent = levels[i].name;
-                    break;
-                }
-            }
-        }
-
-        // Setup engine and runner
-        const engine = Engine.create();
-        const runner = Runner.create();
-
-        const render = Render.create({
-            element: document.getElementById('canvas-container'),
-            engine: engine,
-            options: {
-                width: window.innerWidth,
-                height: window.innerHeight,
-                wireframes: false,
-                background: 'transparent',
-                pixelRatio: window.devicePixelRatio
-            }
+        // Physics setup
+        const engine = Engine.create({
+            gravity: { x: 0, y: 0.98, scale: 0.001 }
         });
+        const runner = Runner.create();
+        let render;
+        let jar;
+        let items = [];
 
+        // Item properties
         const itemProperties = {
             silver: { 
-                density: 0.5,
-                restitution: 0.7,
+                density: 0.8,
+                restitution: 0.3,
                 size: 15,
                 fillStyle: '#C0C0C0',
                 strokeStyle: '#A0A0A0',
                 strokeWidth: 2
             },
             gold: { 
-                density: 1,
-                restitution: 0.6,
+                density: 1.2,
+                restitution: 0.3,
                 size: 15,
                 fillStyle: '#FFD700',
                 strokeStyle: '#DAA520',
@@ -256,7 +223,7 @@
             },
             platinum: { 
                 density: 2,
-                restitution: 0.5,
+                restitution: 0.3,
                 width: 50,
                 height: 25,
                 fillStyle: '#E5E4E2',
@@ -265,7 +232,7 @@
             },
             diamond: { 
                 density: 4,
-                restitution: 0.4,
+                restitution: 0.3,
                 size: 15,
                 fillStyle: '#B9F2FF',
                 strokeStyle: '#87D7FF',
@@ -273,124 +240,251 @@
             }
         };
 
-        // Setup jar dimensions - 20% smaller
-        const jarWidth = 320;
-        const jarHeight = 480;
-        const wallThickness = 16;
-        const jarY = window.innerHeight - 100;
-
-        // Create jar
-        const jar = {
-            bottom: Bodies.rectangle(window.innerWidth/2, jarY, jarWidth, wallThickness, { 
-                isStatic: true,
-                render: { fillStyle: '#444444' }
-            }),
-            left: Bodies.rectangle(window.innerWidth/2 - jarWidth/2, jarY - jarHeight/2, wallThickness, jarHeight, { 
-                isStatic: true,
-                render: { fillStyle: '#444444' }
-            }),
-            right: Bodies.rectangle(window.innerWidth/2 + jarWidth/2, jarY - jarHeight/2, wallThickness, jarHeight, { 
-                isStatic: true,
-                render: { fillStyle: '#444444' }
-            })
+        // Initialize on page load
+        window.onload = function() {
+            initializeValues();
+            setupPhysics();
         };
 
-        // Add jar to world
-        World.add(engine.world, [jar.bottom, jar.left, jar.right]);
-
-        function createItem(type) {
-            const props = itemProperties[type];
-            let body;
-
-            // Wider drop range
-            const dropRange = jarWidth - 100;
-            const xPos = window.innerWidth/2 + (Math.random() * dropRange - dropRange/2);
-            const yPos = 50;
-
-            const options = {
-                density: props.density,
-                restitution: props.restitution,
-                friction: 0.1,
-                frictionAir: 0.001,
-                render: {
-                    fillStyle: props.fillStyle,
-                    strokeStyle: props.strokeStyle,
-                    lineWidth: props.strokeWidth
-                }
-            };
-
-            switch(type) {
-                case 'silver':
-                case 'gold':
-                    body = Bodies.circle(xPos, yPos, props.size, options);
-                    break;
-                case 'platinum':
-                    body = Bodies.rectangle(xPos, yPos, props.width, props.height, options);
-                    break;
-                case 'diamond':
-                    const diamondVertices = Vertices.fromPath(
-                        `0 -${props.size} ${props.size} 0 0 ${props.size} -${props.size} 0`
-                    );
-                    body = Bodies.fromVertices(xPos, yPos, diamondVertices, options);
-                    break;
-            }
-
-            World.add(engine.world, body);
-            itemCount++;
-            totalValue += itemValues[type];
+        function initializeValues() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const paramTokens = urlParams.get('tokens');
             
-            document.getElementById('itemCount').textContent = itemCount;
-            document.getElementById('totalValue').textContent = totalValue;
-            updateLevel();
+            if (paramTokens !== null && !isNaN(parseInt(paramTokens))) {
+                tokenCount = parseInt(paramTokens);
+                vaultValue = parseInt(urlParams.get('vault_value') || '0');
+                cloudFunctionUrl = urlParams.get('cloudFunction') || '';
+                userId = urlParams.get('uid') || '';
+                isUsingDefaults = false;
+            } else {
+                tokenCount = DEFAULT_TOKENS;
+                vaultValue = 0;
+                isUsingDefaults = true;
+                
+                const errorMsg = document.getElementById('errorMessage');
+                errorMsg.textContent = 'Using default values - some features may be limited';
+                errorMsg.style.display = 'block';
+            }
+            
+            updateDisplay();
+            checkButtonStates();
         }
 
-        // Add button event listeners
-        let isClicking = false;
-        const buttons = ['silver-btn', 'gold-btn', 'platinum-btn', 'diamond-btn'];
-        
-        buttons.forEach(btnId => {
-            const btn = document.getElementById(btnId);
-            btn.addEventListener('mousedown', () => {
-                isClicking = true;
-                const type = btnId.split('-')[0];
-                function dropWhileClicking() {
-                    if (isClicking) {
-                        createItem(type);
-                        setTimeout(dropWhileClicking, 100);
-                    }
+        function setupPhysics() {
+            render = Render.create({
+                element: document.getElementById('canvas-container'),
+                engine: engine,
+                options: {
+                    width: window.innerWidth,
+                    height: window.innerHeight,
+                    wireframes: false,
+                    background: 'transparent',
+                    pixelRatio: window.devicePixelRatio
                 }
-                dropWhileClicking();
             });
-        });
 
-        document.addEventListener('mouseup', () => {
-            isClicking = false;
-        });
+            // Setup jar dimensions
+            const jarWidth = 320;
+            const jarHeight = 480;
+            const wallThickness = 30;
+            const jarY = window.innerHeight - 100;
 
-        // Handle window resizing
+            // Create jar with updated collision properties
+            jar = {
+                bottom: Bodies.rectangle(window.innerWidth/2, jarY, jarWidth, wallThickness, { 
+                    isStatic: true,
+                    render: { fillStyle: '#444444' },
+                    friction: 0.5,
+                    restitution: 0.2,
+                    slop: 0,
+                    chamfer: { radius: 2 }
+                }),
+                left: Bodies.rectangle(window.innerWidth/2 - jarWidth/2, jarY - jarHeight/2, wallThickness, jarHeight, { 
+                    isStatic: true,
+                    render: { fillStyle: '#444444' },
+                    friction: 0.5,
+                    slop: 0
+                }),
+                right: Bodies.rectangle(window.innerWidth/2 + jarWidth/2, jarY - jarHeight/2, wallThickness, jarHeight, { 
+                    isStatic: true,
+                    render: { fillStyle: '#444444' },
+                    friction: 0.5,
+                    slop: 0
+                })
+            };
+
+            World.add(engine.world, [jar.bottom, jar.left, jar.right]);
+
+            // Add collision event handling
+            Matter.Events.on(engine, 'collisionStart', function(event) {
+                event.pairs.forEach(function(pair) {
+                    // Add collision handling if needed
+                });
+            });
+
+            Runner.run(runner, engine);
+            Render.run(render);
+        }
+
+        function dropToken(value, type) {
+            if (tokenCount >= value) {
+                const props = itemProperties[type];
+                
+                const dropRange = 200;
+                const xPos = window.innerWidth/2 + (Math.random() * dropRange - dropRange/2);
+                const yPos = 50;
+
+                const options = {
+                    density: props.density,
+                    restitution: props.restitution,
+                    friction: 0.5,
+                    frictionAir: 0.002,
+                    slop: 0,
+                    render: {
+                        fillStyle: props.fillStyle,
+                        strokeStyle: props.strokeStyle,
+                        lineWidth: props.strokeWidth
+                    }
+                };
+
+                let body;
+                switch(type) {
+                    case 'silver':
+                    case 'gold':
+                        body = Bodies.circle(xPos, yPos, props.size, options);
+                        break;
+                    case 'platinum':
+                        body = Bodies.rectangle(xPos, yPos, props.width, props.height, options);
+                        break;
+                    case 'diamond':
+                        const diamondVertices = Vertices.fromPath(
+                            `0 -${props.size} ${props.size} 0 0 ${props.size} -${props.size} 0`
+                        );
+                        body = Bodies.fromVertices(xPos, yPos, diamondVertices, options);
+                        break;
+                }
+
+                World.add(engine.world, body);
+                items.push(body);
+
+                jarValue += value;
+                tokenCount -= value;
+                updateDisplay();
+                document.getElementById('depositBtn').disabled = false;
+            }
+        }
+
+        async function handleDeposit() {
+            if (jarValue <= 0) return;
+
+            const depositBtn = document.getElementById('depositBtn');
+            const errorMsg = document.getElementById('errorMessage');
+            
+            depositBtn.disabled = true;
+            errorMsg.style.display = 'none';
+
+            if (isUsingDefaults) {
+                vaultValue += jarValue;
+                clearJar();
+                updateDisplay();
+                checkButtonStates();
+                return;
+            }
+
+            try {
+                const response = await fetch(cloudFunctionUrl, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        uid: userId,
+                        deposit_amount: jarValue,
+                        current_tokens: tokenCount,
+                        current_vault_value: vaultValue
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(await response.text());
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    vaultValue += jarValue;
+                    clearJar();
+                    updateDisplay();
+                    checkButtonStates();
+                } else {
+                    throw new Error('Deposit failed');
+                }
+            } catch (error) {
+                errorMsg.textContent = error.message;
+                errorMsg.style.display = 'block';
+                tokenCount += jarValue;
+                clearJar();
+                updateDisplay();
+            } finally {
+                depositBtn.disabled = false;
+            }
+        }
+
+        function resetJar() {
+            if (jarValue > 0) {
+                tokenCount += jarValue;
+                clearJar();
+                updateDisplay();
+                checkButtonStates();
+            }
+        }
+
+        function clearJar() {
+            items.forEach(item => World.remove(engine.world, item));
+            items = [];
+            jarValue = 0;
+        }
+
+        function updateDisplay() {
+            document.getElementById('tokenCount').textContent = tokenCount.toLocaleString();
+            document.getElementById('vaultValue').textContent = vaultValue.toLocaleString();
+            document.getElementById('jarValue').textContent = jarValue.toLocaleString();
+            checkButtonStates();
+        }
+
+        function checkButtonStates() {
+            document.getElementById('silverBtn').disabled = tokenCount < 1;
+            document.getElementById('goldBtn').disabled = tokenCount < 5;
+            document.getElementById('platinumBtn').disabled = tokenCount < 10;
+            document.getElementById('diamondBtn').disabled = tokenCount < 25;
+            document.getElementById('depositBtn').disabled = jarValue <= 0;
+        }
+
         window.addEventListener('resize', () => {
-            render.canvas.width = window.innerWidth;
-            render.canvas.height = window.innerHeight;
-            
-            const newJarY = window.innerHeight - 100;
-            
-            Body.setPosition(jar.bottom, { 
-                x: window.innerWidth/2, 
-                y: newJarY 
-            });
-            Body.setPosition(jar.left, { 
-                x: window.innerWidth/2 - jarWidth/2, 
-                y: newJarY - jarHeight/2 
-            });
-            Body.setPosition(jar.right, { 
-                x: window.innerWidth/2 + jarWidth/2, 
-                y: newJarY - jarHeight/2 
-            });
+            if (render) {
+                render.canvas.width = window.innerWidth;
+                render.canvas.height = window.innerHeight;
+                
+                const jarY = window.innerHeight - 100;
+                const jarWidth = 320;
+                const jarHeight = 480;
+                
+                Body.setPosition(jar.bottom, { 
+                    x: window.innerWidth/2, 
+                    y: jarY 
+                });
+                Body.setPosition(jar.left, { 
+                    x: window.innerWidth/2 - jarWidth/2, 
+                    y: jarY - jarHeight/2 
+                });
+                Body.setPosition(jar.right, { 
+                    x: window.innerWidth/2 + jarWidth/2, 
+                    y: jarY - jarHeight/2 
+                });
+            }
         });
-
-        // Start the engine
-        Runner.run(runner, engine);
-        Render.run(render);
     </script>
 </body>
 </html>
