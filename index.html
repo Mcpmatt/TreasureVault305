@@ -76,6 +76,19 @@
                 0 2px 4px rgba(0,0,0,0.3);
         }
 
+        .jackpot-btn {
+            background: radial-gradient(circle at 30% 30%, #FFD700, #B8860B);
+            width: clamp(60px, 15vw, 75px);
+            height: clamp(60px, 15vw, 75px);
+            border-radius: 50%;
+            position: relative;
+            border: 3px solid #DAA520;
+            box-shadow: 
+                0 0 15px #FFD700,
+                inset 0 0 10px #B8860B;
+            animation: pulse 2s infinite;
+        }
+
         /* Updated platinum button style to align the number */
         #platinumBtn {
             width: clamp(60px, 12vw, 65px);
@@ -240,6 +253,12 @@
             }
         }
 
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
     </style>
 </head>
 <body>
@@ -267,6 +286,7 @@
                 <button id="goldBtn" class="token-btn coin-btn" onclick="dropToken(5, 'gold')">5</button>
                 <button id="platinumBtn" class="token-btn" onclick="dropToken(10, 'platinum')">10</button>
                 <button id="diamondBtn" class="token-btn diamond-btn" onclick="dropToken(25, 'diamond')"><span>25</span></button>
+                <button id="jackpotBtn" class="token-btn jackpot-btn" onclick="dropToken(1000, 'jackpot')"><span>1000</span></button>
             </div>
             <div class="action-buttons">
                 <button id="depositBtn" onclick="handleDeposit()" disabled>Deposit to Vault</button>
@@ -281,7 +301,7 @@
 
     <script>
         // Constants
-        const DEFAULT_TOKENS = 500;
+        const DEFAULT_TOKENS = 5000;
         
         // Initialize variables
         let tokenCount = DEFAULT_TOKENS;
@@ -302,8 +322,19 @@
 
         // Physics setup
         const engine = Engine.create({
-            gravity: { x: 0, y: 0.98, scale: 0.001 }
+            gravity: { x: 0, y: 0.98, scale: 0.001 },
+            positionIterations: 8,
+            velocityIterations: 8,
+            constraintIterations: 4     // Add constraint iterations for stability
         });
+
+        engine.world.gravity.scale = 0.001;
+        engine.timing.timeScale = 1;
+
+        // Important: Add these collision filter categories
+        const defaultCategory = 0x0001;
+        const itemCategory = 0x0002;
+
         const runner = Runner.create();
         let render;
         let jar;
@@ -312,49 +343,60 @@
         // Item properties
         const itemProperties = {
             silver: { 
-                density: 0.2,
-                restitution: 0.95,
+                density: 0.0003,          // Very light for good stacking
+                restitution: .9,       // Moderate bounce
                 size: 12,
                 fillStyle: '#C0C0C0',
                 strokeStyle: '#A0A0A0',
                 strokeWidth: 2,
-                frictionAir: 0.001,
-                torque: 0.05,
-                particleColor: '#C0C0C0'
+                friction: 0.2,          // Some friction for stability
+                frictionAir: 0.002,     // Slight air resistance
+                frictionStatic: 0.3     // Enough to stack
             },
             gold: { 
-                density: 0.8,
-                restitution: 0.7,
+                density: 0.0004,         // Slightly heavier than silver
+                restitution: .7,       // More bouncy
                 size: 15,
                 fillStyle: '#FFD700',
                 strokeStyle: '#DAA520',
                 strokeWidth: 2,
-                frictionAir: 0.002,
-                torque: 0.03,
-                particleColor: '#FFD700'
+                friction: 0.15,         // Less friction than silver
+                frictionAir: 0.005,
+                frictionStatic: 0.25
             },
             platinum: { 
-                density: 2.5,
-                restitution: 0.4,
+                density: 0.0007,          // Heavier than gold
+                restitution: 0.2,       // Even more bouncy
                 width: 50,
                 height: 25,
                 fillStyle: '#E5E4E2',
                 strokeStyle: '#B4B4B4',
                 strokeWidth: 3,
-                frictionAir: 0.003,
-                torque: 0.02,
-                particleColor: '#E5E4E2'
+                friction: 0.1,
+                frictionAir: 0.01,
+                frictionStatic: 0.2
             },
             diamond: { 
-                density: 10.0,
-                restitution: 0.15,
+                density: 0.0009,         // Heavier than platinum
+                restitution: 0.1,       // Very bouncy
                 size: 20,
                 fillStyle: '#B9F2FF',
                 strokeStyle: '#87D7FF',
                 strokeWidth: 3,
-                frictionAir: 0.005,
-                torque: 0.01,
-                particleColor: '#B9F2FF'
+                friction: 0.1,
+                frictionAir: 0.01,
+                frictionStatic: 0.2
+            },
+            jackpot: { 
+                density: 0.1525,          // Heaviest but not too heavy
+                restitution: 1.05,       // Most bouncy
+                size: 35,
+                fillStyle: '#FFD700',
+                strokeStyle: '#DAA520',
+                strokeWidth: 4,
+                friction: 0.05,         // Very low friction for more movement
+                frictionAir: 0.0005,    // Minimal air resistance
+                frictionStatic: 0.1     // Low static friction for more movement
             }
         };
 
@@ -409,49 +451,42 @@
                     width: window.innerWidth,
                     height: window.innerHeight,
                     wireframes: false,
-                    background: 'transparent',
-                    pixelRatio: window.devicePixelRatio
+                    background: 'transparent'
                 }
             });
 
-            // Setup jar dimensions
+            // Fixed jar dimensions
             const jarWidth = 320;
             const jarHeight = 480;
-            const wallThickness = 30;
+            const wallThickness = 40;
             const jarY = window.innerHeight - 30;
 
-            // Create jar with updated collision properties
             jar = {
                 bottom: Bodies.rectangle(window.innerWidth/2, jarY, jarWidth, wallThickness, { 
                     isStatic: true,
                     render: { fillStyle: '#444444' },
-                    friction: 0.5,
-                    restitution: 0.2,
-                    slop: 0,
-                    chamfer: { radius: 2 }
+                    friction: 0.1,          // Low friction
+                    restitution: 0.0,       // Bouncy bottom
+                    chamfer: { radius: 1 }
                 }),
                 left: Bodies.rectangle(window.innerWidth/2 - jarWidth/2, jarY - jarHeight/2, wallThickness, jarHeight, { 
                     isStatic: true,
                     render: { fillStyle: '#444444' },
-                    friction: 0.5,
-                    slop: 0
+                    friction: 0.1,
+                    restitution: 0.4
                 }),
                 right: Bodies.rectangle(window.innerWidth/2 + jarWidth/2, jarY - jarHeight/2, wallThickness, jarHeight, { 
                     isStatic: true,
                     render: { fillStyle: '#444444' },
-                    friction: 0.5,
-                    slop: 0
+                    friction: 0.1,
+                    restitution: 0.4
                 })
             };
 
             World.add(engine.world, [jar.bottom, jar.left, jar.right]);
 
-            // Add collision event handling
-            Matter.Events.on(engine, 'collisionStart', function(event) {
-                event.pairs.forEach(function(pair) {
-                    // Add collision handling if needed
-                });
-            });
+            Matter.Events.on(engine, 'afterUpdate', monitorBodies);
+
 
             Runner.run(runner, engine);
             Render.run(render);
@@ -476,18 +511,22 @@
         function dropToken(value, type) {
             if (tokenCount >= value) {
                 const props = itemProperties[type];
-                
-                // Increased drop height for more dramatic effect
                 const dropRange = 200;
-                const xPos = window.innerWidth/2 + (Math.random() * dropRange - dropRange/2);
-                const yPos = 20; // Higher drop point
+                const xPos = window.innerWidth/2 + (Math.random() * dropRange - dropRange/2); // Added this
+                const yPos = 20; // Added this
 
                 const options = {
                     density: props.density,
                     restitution: props.restitution,
-                    friction: 0.5,
+                    friction: props.friction,
                     frictionAir: props.frictionAir,
-                    slop: 0,
+                    frictionStatic: props.frictionStatic,
+                    angularDamping: props.angularDamping,
+                    slop: 0,                    // Prevent slipping
+                    collisionFilter: {
+                        category: itemCategory,  // Assign item category
+                        mask: defaultCategory | itemCategory // Collide with walls and other items
+                    },
                     render: {
                         fillStyle: props.fillStyle,
                         strokeStyle: props.strokeStyle,
@@ -500,25 +539,31 @@
                     case 'silver':
                     case 'gold':
                         body = Bodies.circle(xPos, yPos, props.size, options);
-                        // Add initial spin
-                        Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.2);
+                        //Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.03);
                         break;
                     case 'platinum':
                         body = Bodies.rectangle(xPos, yPos, props.width, props.height, options);
-                        Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.1);
+                        Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.02);
                         break;
                     case 'diamond':
                         const diamondVertices = Vertices.fromPath(
                             `0 -${props.size} ${props.size} 0 0 ${props.size} -${props.size} 0`
                         );
                         body = Bodies.fromVertices(xPos, yPos, diamondVertices, options);
-                        Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.05);
+                        Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.01);
                         break;
+                    case 'jackpot':
+                        body = Bodies.circle(xPos, yPos, props.size, options);
+                        Body.setAngularVelocity(body, (Math.random() - 0.5) * 0.1);
+                        break;
+                    default:
+                        console.error('Invalid token type:', type);
+                        return;
                 }
 
-                // Add random initial velocity
+                // Reduced initial velocity
                 Body.setVelocity(body, {
-                    x: (Math.random() - 0.5) * 2,
+                    x: (Math.random() - 0.5) * 0.5,
                     y: 0
                 });
 
@@ -531,6 +576,74 @@
                 document.getElementById('depositBtn').disabled = false;
             }
         }
+
+        function monitorBodies() {
+            const bodies = Composite.allBodies(engine.world);
+            const jarBottom = jar.bottom.position.y - (jar.bottom.bounds.max.y - jar.bottom.bounds.min.y) / 2;
+            const jarLeft = jar.left.position.x + 15; // Add buffer from left wall
+            const jarRight = jar.right.position.x - 15; // Add buffer from right wall
+            
+            bodies.forEach(body => {
+                if (!body.isStatic) {
+                    // Get the actual size of the body
+                    const size = Math.max(
+                        body.bounds.max.x - body.bounds.min.x,
+                        body.bounds.max.y - body.bounds.min.y
+                    ) / 2;
+                    
+                    // Check bottom boundary
+                    if (body.position.y + size > jarBottom) {
+                        Body.setPosition(body, {
+                            x: body.position.x,
+                            y: jarBottom - size
+                        });
+                        Body.setVelocity(body, { x: 0, y: 0 });
+                    }
+                    
+                    // Check side boundaries and push inward
+                    if (body.position.x - size < jarLeft) {
+                        Body.setPosition(body, {
+                            x: jarLeft + size,
+                            y: body.position.y
+                        });
+                        Body.setVelocity(body, { x: 0, y: body.velocity.y });
+                    }
+                    if (body.position.x + size > jarRight) {
+                        Body.setPosition(body, {
+                            x: jarRight - size,
+                            y: body.position.y
+                        });
+                        Body.setVelocity(body, { x: 0, y: body.velocity.y });
+                    }
+                }
+            });
+        }
+
+        // Add this right after monitorBodies
+        Matter.Events.on(engine, 'afterUpdate', function() {
+            monitorBodies();
+            
+            // Get all bodies and sort by height
+            const bodies = Composite.allBodies(engine.world)
+                .filter(body => !body.isStatic)
+                .sort((a, b) => a.position.y - b.position.y);
+            
+            // Check stack pressure
+            bodies.forEach((body, index) => {
+                const bodiesAbove = bodies.filter(b => 
+                    b.position.y < body.position.y && 
+                    Math.abs(b.position.x - body.position.x) < 30
+                );
+                
+                // If too many bodies are stacked above, apply slight upward force
+                if (bodiesAbove.length > 10) {
+                    Body.applyForce(body, body.position, {
+                        x: 0,
+                        y: -0.0001 * bodiesAbove.length
+                    });
+                }
+            });
+        });
 
         // Enhanced collision handling
         Matter.Events.on(engine, 'collisionStart', function(event) {
@@ -546,7 +659,7 @@
                         collision.bodyA.render.fillStyle
                     );
                 }
-                
+                /*
                 // Add random spin on collision
                 if (!pair.bodyA.isStatic) {
                     Body.setAngularVelocity(
@@ -559,7 +672,7 @@
                         pair.bodyB,
                         pair.bodyB.angularVelocity + (Math.random() - 0.5) * 0.1
                     );
-                }
+                }*/
             });
         });
 
@@ -646,6 +759,7 @@
             document.getElementById('goldBtn').disabled = tokenCount < 5;
             document.getElementById('platinumBtn').disabled = tokenCount < 10;
             document.getElementById('diamondBtn').disabled = tokenCount < 25;
+            document.getElementById('jackpotBtn').disabled = tokenCount < 1000;
             document.getElementById('depositBtn').disabled = jarValue <= 0;
         }
 
@@ -654,7 +768,7 @@
                 render.canvas.width = window.innerWidth;
                 render.canvas.height = window.innerHeight;
                 
-                const jarY = window.innerHeight - 100;
+                const jarY = window.innerHeight - 30;
                 const jarWidth = 320;
                 const jarHeight = 480;
                 
