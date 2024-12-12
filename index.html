@@ -46,13 +46,7 @@
             padding: 10px;
             align-items: center; /* Ensure buttons are centered vertically */
         }
-
-        .token-buttons button {
-            flex: 1 1 auto; /* Allow buttons to grow and shrink as needed */
-            min-width: 50px; /* Ensure a minimum width */
-            max-width: 100px; /* Set a maximum width for the buttons */
-        }
-
+        
         /* Shared button styles */
         .token-btn {
             border: none;
@@ -230,6 +224,12 @@
                 grid-template-columns: repeat(2, 1fr);
                 justify-items: center;
                 gap: 12px;
+            }
+
+            .token-buttons button {
+                flex: 1 1 auto; /* Allow buttons to grow and shrink as needed */
+                min-width: 50px; /* Ensure a minimum width */
+                max-width: 100px; /* Set a maximum width for the buttons */
             }
 
             .action-buttons {
